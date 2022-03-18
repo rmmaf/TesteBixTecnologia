@@ -1,0 +1,88 @@
+---
+title: "Teste Bix Tecnologia"
+output: html_notebook
+---
+
+```{r echo=TRUE, message=FALSE}
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+filePath <- "./Data/Base de Dados - Questionário.xlsx"
+
+vendasDf <- read_excel(filePath, sheet = "Sheet1")
+consumidorDf <- read_excel(filePath, sheet = "Sheet3")
+lojasDf <- read_excel(filePath, sheet = "Sheet4")
+produtoDf <- read_excel(filePath, sheet = "Sheet2")
+```
+
+Quantos produtos únicos foram vendidos?
+
+```{r echo=TRUE}
+print(length(unique(vendasDf$ProductID)))
+```
+
+Qual o produto mais vendido e quantos desse produto foram vendidos?
+
+```{r echo=TRUE}
+ids <- unique(vendasDf$ProductID)
+id <- ids[which.max(tabulate(match(vendasDf$ProductID, ids)))]
+prod <- produtoDf[produtoDf$ID == id,]
+vendas <- sum(vendasDf[vendasDf$ProductID == id, "Quantity"])
+print(cbind(prod, data.frame(Vendas = vendas)))
+```
+
+Considerando o ano de 2019, qual gráfico abaixo mais se parece à quantidade mensal do vendida do produto "Iron Man, G" ? 
+
+```{r echo=TRUE}
+id <- as.data.frame(produtoDf[produtoDf$Name == "Iron Man" & produtoDf$Size == "G", "ID"])[1,1]
+auxDf <- vendasDf[which((lubridate::year(vendasDf$Date) == "2019") & (vendasDf$ProductID == id)), c("Quantity", "Date")]
+auxDf$Date <- lubridate::month(auxDf$Date)
+mes <- c()
+vendas <- c()
+for (m in 1:12) {
+  mes <- c(mes, m)
+  vendas <- c(vendas, sum(auxDf[auxDf$Date == m, "Quantity"]))
+}
+plotDf <- data.frame(mes, vendas)
+ggplot(plotDf, aes(x = mes, y = vendas)) + 
+  geom_line()
+```
+
+Considerando a receita líquida mensal de vendas em 2019. Quais os valores de: média, mediana e desvio padrão desses valores?
+
+```{r echo=TRUE}
+auxDf <- vendasDf[which((lubridate::year(vendasDf$Date) == "2019")), c("Quantity", "Date", "Discount", "UnitPrice")]
+auxDf$Date <- lubridate::month(auxDf$Date)
+
+auxDf$ReceitaVenda <- auxDf$Quantity*(1- auxDf$Discount)*auxDf$UnitPrice
+
+receitaMensal <- c()
+for (m in 1:12) {
+  receitaMensal <- c(receitaMensal, sum(auxDf[auxDf$Date == m, "ReceitaVenda"]))
+}
+print(paste0("Média: ", mean(receitaMensal), " Mediana: ", median(receitaMensal), " Desvio Padrão:", sd(receitaMensal)))
+```
+Ainda considerando os dados de receita líquida de vendas em 2019, seu time deve focar esforços em uma das lojas para criar análises mais profundas e a primeira versão do modelo preditivo. Qual destas lojas você escolheria para prosseguir com o projeto? (1 ponto)
+
+```{r echo=TRUE, results='asis'}
+auxDf <- vendasDf[which((lubridate::year(vendasDf$Date) == "2019")),]
+
+auxDf$ReceitaVenda <- auxDf$Quantity*(1- auxDf$Discount)*auxDf$UnitPrice
+
+lojas <- unique(auxDf$StoreID)
+nome <- c()
+diasUnicos <- c()
+vendas <- c()
+for (l in lojas) {
+  nomeLoja <- as.data.frame(lojasDf[lojasDf$ID == l, "Name"])[1,1]
+  lojaDf <- auxDf[auxDf$StoreID == l,]
+  nome <- c(nome, nomeLoja)
+  diasUnicos <- c(diasUnicos, length(unique(lojaDf$Date)))
+  vendas <- c(vendas, nrow(lojaDf))
+}
+data.frame(Nome = nome, Datas = diasUnicos, Numero_Vendas = vendas)
+```
+Vemos que a loja com mais dias diferentes vendidos (que comtempla mais datas) e com mais dados de venda é Florianópolis, logo é mais preciso o modelo de Florianópolis
+
+
